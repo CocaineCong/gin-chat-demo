@@ -1,7 +1,12 @@
 package main
 
-import "fmt"
+import (
+	"chat/conf"
+	"chat/router"
+)
 
 func main() {
-	fmt.Println("hello world")
+	conf.Init()
+	r:=router.NewRouter()
+	_ = r.Run(conf.HttpPort)
 }
