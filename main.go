@@ -1,1 +1,7 @@
-package gin_chat_demo
+package main
+
+import "fmt"
+
+func main() {
+	fmt.Println("hello world")
+}
