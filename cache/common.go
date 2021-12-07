@@ -17,7 +17,7 @@ var (
 	RedisDbName    		string
 )
 
-// Redis 在中间件中初始化redis链接  防止循环导包，所以放在这里
+// Redis 初始化redis链接
 func init() {
 	file, err := ini.Load("./conf/config.ini")
 	if err != nil {
@@ -29,10 +29,10 @@ func init() {
 
 //Redis 在中间件中初始化redis链接
 func Redis() {
-	db, _ := strconv.ParseUint(RedisDbName, 10, 64) 		//TODO 这里记得了！！
+	db, _ := strconv.ParseUint(RedisDbName, 10, 64)
 	client := redis.NewClient(&redis.Options{
 		Addr:     RedisAddr,
-		//Password: conf.RedisPw,
+		//Password: conf.RedisPw,  // 无密码，就这样就好了
 		DB:       int(db),
 	})
 	_, err := client.Ping().Result()
@@ -45,8 +45,8 @@ func Redis() {
 
 
 func LoadRedisData(file *ini.File) {
-	RedisDb = file.Section("redis").Key("RedisDb").MustString("redis")
-	RedisAddr = file.Section("redis").Key("RedisAddr").MustString("127.0.0.1:6379")
-	RedisPw = file.Section("redis").Key("RedisPw").MustString("root")
-	RedisDbName = file.Section("redis").Key("RedisDbName").MustString("2")
+	RedisDb = file.Section("redis").Key("RedisDb").String()
+	RedisAddr = file.Section("redis").Key("RedisAddr").String()
+	RedisPw = file.Section("redis").Key("RedisPw").String()
+	RedisDbName = file.Section("redis").Key("RedisDbName").String()
 }
