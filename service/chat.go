@@ -2,6 +2,7 @@ package service
 
 import (
 	"chat/cache"
+	"chat/conf"
 	"chat/e"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -22,8 +23,9 @@ type SendMsg struct {
 
 // 回复的消息
 type ReplyMsg struct {
+	From string `json:"from"`
 	Code int `json:"code"`
-	Content string `json:"content"`
+	Content interface{} `json:"content"`
 }
 
 // 用户类
@@ -134,7 +136,26 @@ func (c *Client) Read(){
 			if err != nil {
 				timeT = 9999999
 			}
-			results, _ :=
+			results, _ := FindManyMsg(conf.MongoDBName,c.SendID,c.ID,int64(timeT),10)
+			if len(results) > 10 {
+				results = results[:10]
+			}else if len(results) == 0{
+				replyMsg := &ReplyMsg{
+					Code:e.WebsocketEnd,
+					Content:"到底了",
+				}
+				_ = c.Socket.WriteMessage(websocket.TextMessage,*(*[]byte)(unsafe.Pointer(replyMsg)))
+				continue
+			}
+			for _, result := range results {
+				replyMsg := &ReplyMsg{
+					From:result.From,
+					Content:result.Msg,
+				}
+				_ = c.Socket.WriteMessage(websocket.TextMessage,*(*[]byte)(unsafe.Pointer(replyMsg)))
+			}
+		}else if sendMsg.Type==3{
+
 		}
 	}
 }
