@@ -3,11 +3,11 @@ package service
 import (
 	"chat/cache"
 	"chat/e"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 	"unsafe"
 )
@@ -125,6 +125,16 @@ func (c *Client) Read(){
 				_ , _ =cache.RedisClient.Expire(c.ID,time.Hour*24*30*3).Result() // 防止过快“分手”，建立连接三个月过期
 			}
 			log.Println(c.ID,"发送消息",sendMsg.Content)
+			Manager.Broadcast <- &Broadcast{
+				Client:c,
+				Message:[]byte(sendMsg.Content),
+			}
+		}else if sendMsg.Type == 2 { //拉取历史消息
+			timeT, err := strconv.Atoi(sendMsg.Content)
+			if err != nil {
+				timeT = 9999999
+			}
+			results, _ :=
 		}
 	}
 }
