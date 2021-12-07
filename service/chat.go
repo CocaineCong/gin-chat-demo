@@ -45,7 +45,7 @@ type Broadcast struct {
 
 // 用户管理
 type ClientManager struct {
-	Client 		map[string]*Client
+	Clients 		map[string]*Client
 	Broadcast 	chan *Broadcast
 	Reply 		chan *Client
 	Register 	chan *Client
@@ -60,7 +60,7 @@ type Message struct {
 }
 
 var Manager  = ClientManager{
-	Client	 : 	make(map[string]*Client), // 参与连接的用户，出于性能的考虑，需要设置最大连接数
+	Clients	 : 	make(map[string]*Client), // 参与连接的用户，出于性能的考虑，需要设置最大连接数
 	Broadcast:	make(chan *Broadcast),
 	Register : 	make(chan *Client),
 	Reply 	 : 	make(chan *Client),
@@ -92,7 +92,7 @@ func WsHandler(c *gin.Context) {
 	// 用户注册到用户管理上
 	Manager.Register <- client
 	go client.Read()
-	//go client.Write()
+	go client.Write()
 }
 
 func (c *Client) Read(){
@@ -116,8 +116,8 @@ func (c *Client) Read(){
 			r2 ,_ := cache.RedisClient.Get(c.SendID).Result()
 			if r1 >= "3" && r2 == "" {
 				replyMsg := &ReplyMsg{
-					Code:e.WebsocketLimit,
-					Content:"达到限制",
+					Code:    e.WebsocketLimit,
+					Content: "达到限制",
 				}
 				_ = c.Socket.WriteMessage(websocket.TextMessage,*(*[]byte)(unsafe.Pointer(replyMsg)))
 				_,_ = cache.RedisClient.Expire(c.ID,time.Hour*24*30).Result() // 防止重复骚扰，未建立连接刷新过期时间一个月
@@ -155,7 +155,39 @@ func (c *Client) Read(){
 				_ = c.Socket.WriteMessage(websocket.TextMessage,*(*[]byte)(unsafe.Pointer(replyMsg)))
 			}
 		}else if sendMsg.Type==3{
-
+			results,err := FirstFindMsg(conf.MongoDBName,c.SendID,c.ID)
+			if err != nil {
+				log.Println(err)
+			}
+			for _, result := range results {
+				replyMsg := &ReplyMsg{
+					From:result.From,
+					Content:result.Msg,
+				}
+				_ = c.Socket.WriteMessage(websocket.TextMessage,*(*[]byte)(unsafe.Pointer(replyMsg)))
+			}
 		}
+	}
+}
+
+func (c *Client) Write() {
+	defer func() {
+		_ = c.Socket.Close()
+	}()
+	for{
+		select {
+		case message, ok := <-c.Send :
+			if !ok {
+				_=c.Socket.WriteMessage(websocket.CloseMessage,[]byte{})
+				return
+			}
+			log.Println(c.ID,"接受消息:",string(message))
+			replyMsg := &ReplyMsg{
+				Code:e.WebsocketSuccessMessage,
+				Content:message,
+			}
+			_ = c.Socket.WriteMessage(websocket.TextMessage,*(*[]byte)(unsafe.Pointer(replyMsg)))
+		}
+
 	}
 }
