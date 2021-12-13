@@ -34,7 +34,6 @@ func InsertMsg(database string, id string, content string, read uint, expire int
 func FindMany(database string, sendId string,id string,time int64,pageSize int) (results []ws.Result,err error) {
 	var resultsMe []ws.Trainer
 	var resultsYou []ws.Trainer
-	fmt.Println(database,sendId,id,time,pageSize)
 	sendIdCollection := conf.MongoDBClient.Database(database).Collection(sendId)
 	idCollection := conf.MongoDBClient.Database(database).Collection(id)
 	filter := bson.M{}
@@ -45,7 +44,6 @@ func FindMany(database string, sendId string,id string,time int64,pageSize int) 
 	err = sendIdTimeCursor.All(context.TODO(), &resultsYou)		// sendId 对面发过来的
 	err = idTimeCursor.All(context.TODO(), &resultsMe)			// Id 发给对面的
 	results, _ = AppendAndSort(resultsMe, resultsYou)
-	fmt.Println("results",results)
 	return
 }
 
@@ -101,8 +99,6 @@ func FirstFindMsg(database string,sendId string,id string) (results []ws.Result,
 }
 
 func AppendAndSort(resultsMe, resultsYou []ws.Trainer) (results []ws.Result, err error) {
-	fmt.Println("resultsMe",resultsMe)
-	fmt.Println("resultsYou",resultsYou)
 	for _,r:=range resultsMe{
 		sendSort := SendSortMsg{
 			Content:r.Content,
