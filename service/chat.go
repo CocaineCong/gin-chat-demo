@@ -4,13 +4,14 @@ import (
 	"chat/cache"
 	"chat/conf"
 	"chat/e"
+	"encoding/json"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
 	"strconv"
 	"time"
-	"unsafe"
 )
 
 const month = 60 * 60 * 24 * 30 // 按照30天算一个月
@@ -23,16 +24,16 @@ type SendMsg struct {
 
 // 回复的消息
 type ReplyMsg struct {
-	From string `json:"from"`
-	Code int `json:"code"`
-	Content interface{} `json:"content"`
+	From 	string  `json:"from"`
+	Code 	int 	`json:"code"`
+	Content string  `json:"content"`
 }
 
 // 用户类
 type Client struct {
 	ID 		string
 	SendID 	string
-	Socket *websocket.Conn
+	Socket  *websocket.Conn
 	Send chan []byte
 }
 
@@ -45,7 +46,7 @@ type Broadcast struct {
 
 // 用户管理
 type ClientManager struct {
-	Clients 		map[string]*Client
+	Clients 	map[string]*Client
 	Broadcast 	chan *Broadcast
 	Reply 		chan *Client
 	Register 	chan *Client
@@ -60,7 +61,7 @@ type Message struct {
 }
 
 var Manager  = ClientManager{
-	Clients	 : 	make(map[string]*Client), // 参与连接的用户，出于性能的考虑，需要设置最大连接数
+	Clients	 : 	make(map[string]*Client),   // 参与连接的用户，出于性能的考虑，需要设置最大连接数
 	Broadcast:	make(chan *Broadcast),
 	Register : 	make(chan *Client),
 	Reply 	 : 	make(chan *Client),
@@ -73,8 +74,8 @@ func createId(uid, toUid string) string {
 
 func WsHandler(c *gin.Context) {
 	uid:=c.Query("uid") // 自己的id
-	toUid:=c.Query("to_uid") // 对方的id
-	conn, err := (websocket.Upgrader{
+	toUid:=c.Query("toUid") // 对方的id
+	conn, err := (&websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool { // CheckOrigin解决跨域问题
 		return true
 	}}).Upgrade(c.Writer, c.Request, nil) // 升级成ws协议
@@ -115,11 +116,12 @@ func (c *Client) Read(){
 			r1 ,_ := cache.RedisClient.Get(c.ID).Result()
 			r2 ,_ := cache.RedisClient.Get(c.SendID).Result()
 			if r1 >= "3" && r2 == "" {
-				replyMsg := &ReplyMsg{
+				replyMsg := ReplyMsg{
 					Code:    e.WebsocketLimit,
 					Content: "达到限制",
 				}
-				_ = c.Socket.WriteMessage(websocket.TextMessage,*(*[]byte)(unsafe.Pointer(replyMsg)))
+				msg , _ := json.Marshal(replyMsg)
+				_ = c.Socket.WriteMessage(websocket.TextMessage, msg)
 				_,_ = cache.RedisClient.Expire(c.ID,time.Hour*24*30).Result() // 防止重复骚扰，未建立连接刷新过期时间一个月
 				continue
 			}else{
@@ -132,27 +134,29 @@ func (c *Client) Read(){
 				Message:[]byte(sendMsg.Content),
 			}
 		}else if sendMsg.Type == 2 { //拉取历史消息
-			timeT, err := strconv.Atoi(sendMsg.Content)
+			timeT, err := strconv.Atoi(sendMsg.Content) // 传送来时间
 			if err != nil {
-				timeT = 9999999
+				timeT = 999999999
 			}
-			results, _ := FindManyMsg(conf.MongoDBName,c.SendID,c.ID,int64(timeT),10)
+			results, _ := FindMany(conf.MongoDBName,c.SendID,c.ID,int64(timeT),10)
 			if len(results) > 10 {
 				results = results[:10]
 			}else if len(results) == 0{
-				replyMsg := &ReplyMsg{
+				replyMsg := ReplyMsg{
 					Code:e.WebsocketEnd,
 					Content:"到底了",
 				}
-				_ = c.Socket.WriteMessage(websocket.TextMessage,*(*[]byte)(unsafe.Pointer(replyMsg)))
+				msg , _ := json.Marshal(replyMsg)
+				_ = c.Socket.WriteMessage(websocket.TextMessage,msg)
 				continue
 			}
 			for _, result := range results {
-				replyMsg := &ReplyMsg{
+				replyMsg := ReplyMsg{
 					From:result.From,
-					Content:result.Msg,
+					Content:fmt.Sprintf("%s",result.Msg),
 				}
-				_ = c.Socket.WriteMessage(websocket.TextMessage,*(*[]byte)(unsafe.Pointer(replyMsg)))
+				msg , _ := json.Marshal(replyMsg)
+				_ = c.Socket.WriteMessage(websocket.TextMessage,msg)
 			}
 		}else if sendMsg.Type==3{
 			results,err := FirstFindMsg(conf.MongoDBName,c.SendID,c.ID)
@@ -160,11 +164,12 @@ func (c *Client) Read(){
 				log.Println(err)
 			}
 			for _, result := range results {
-				replyMsg := &ReplyMsg{
+				replyMsg := ReplyMsg{
 					From:result.From,
-					Content:result.Msg,
+					Content:fmt.Sprintf("%s",result.Msg),
 				}
-				_ = c.Socket.WriteMessage(websocket.TextMessage,*(*[]byte)(unsafe.Pointer(replyMsg)))
+				msg , _ := json.Marshal(replyMsg)
+				_ = c.Socket.WriteMessage(websocket.TextMessage, msg)
 			}
 		}
 	}
@@ -182,12 +187,12 @@ func (c *Client) Write() {
 				return
 			}
 			log.Println(c.ID,"接受消息:",string(message))
-			replyMsg := &ReplyMsg{
+			replyMsg := ReplyMsg{
 				Code:e.WebsocketSuccessMessage,
-				Content:message,
+				Content:fmt.Sprintf("%s",string(message)),
 			}
-			_ = c.Socket.WriteMessage(websocket.TextMessage,*(*[]byte)(unsafe.Pointer(replyMsg)))
+			msg , _ := json.Marshal(replyMsg)
+			_ = c.Socket.WriteMessage(websocket.TextMessage, msg)
 		}
-
 	}
 }

@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewRouter() gin.Engine {
+func NewRouter() *gin.Engine {
 	conf.Init()
 	r := gin.Default()
 	r.Use(gin.Recovery(),gin.Logger())

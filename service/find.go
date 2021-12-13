@@ -4,6 +4,7 @@ import (
 	"chat/conf"
 	"chat/model/ws"
 	"context"
+	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"log"
@@ -30,19 +31,21 @@ func InsertMsg(database string, id string, content string, read uint, expire int
 	return
 }
 
-func FindManyMsg(database string, sendID string,id string,time int64,pageSize int) (results []ws.Result,err error) {
+func FindMany(database string, sendId string,id string,time int64,pageSize int) (results []ws.Result,err error) {
 	var resultsMe []ws.Trainer
 	var resultsYou []ws.Trainer
-	sendIdCollection := conf.MongoDBClient.Database(database).Collection(sendID)
+	fmt.Println(database,sendId,id,time,pageSize)
+	sendIdCollection := conf.MongoDBClient.Database(database).Collection(sendId)
 	idCollection := conf.MongoDBClient.Database(database).Collection(id)
-	filter := bson.M{"startTime": bson.M{"$lt": time}}
+	filter := bson.M{}
 	sendIdTimeCursor, err := sendIdCollection.Find(context.TODO(), filter,
-		options.Find().SetSort(bson.D{{"StartTime", -1}}), options.Find().SetLimit(int64(pageSize)))
-	idTimeCurcor, err := idCollection.Find(context.TODO(), filter,
-		options.Find().SetSort(bson.D{{"StartTime", -1}}), options.Find().SetLimit(int64(pageSize)))
-	err = sendIdTimeCursor.All(context.TODO(), &resultsYou) // sendId 对面发过来的
-	err = idTimeCurcor.All(context.TODO(), &resultsMe)      // Id 发给对面的
+		options.Find().SetSort(bson.D{{"startTime", -1}}), options.Find().SetLimit(int64(pageSize)))
+	idTimeCursor, err := idCollection.Find(context.TODO(), filter,
+		options.Find().SetSort(bson.D{{"startTime", -1}}), options.Find().SetLimit(int64(pageSize)))
+	err = sendIdTimeCursor.All(context.TODO(), &resultsYou)		// sendId 对面发过来的
+	err = idTimeCursor.All(context.TODO(), &resultsMe)			// Id 发给对面的
 	results, _ = AppendAndSort(resultsMe, resultsYou)
+	fmt.Println("results",results)
 	return
 }
 
@@ -77,7 +80,7 @@ func FirstFindMsg(database string,sendId string,id string) (results []ws.Result,
 		err = idtimeCursor.All(context.TODO(),&resultsMe)
 		results,err = AppendAndSort(resultsMe,resultsYou)
 	}else {
-		results,err = FindManyMsg(database,sendId,id,99999999,10)
+		results,err = FindMany(database,sendId,id,9999999999,10)
 	}
 	overTimeFilter := bson.D{
 		{"$and",bson.A{
@@ -98,6 +101,8 @@ func FirstFindMsg(database string,sendId string,id string) (results []ws.Result,
 }
 
 func AppendAndSort(resultsMe, resultsYou []ws.Trainer) (results []ws.Result, err error) {
+	fmt.Println("resultsMe",resultsMe)
+	fmt.Println("resultsYou",resultsYou)
 	for _,r:=range resultsMe{
 		sendSort := SendSortMsg{
 			Content:r.Content,
@@ -106,7 +111,7 @@ func AppendAndSort(resultsMe, resultsYou []ws.Trainer) (results []ws.Result, err
 		}
 		result := ws.Result{
 			StartTime:r.StartTime,
-			Msg: sendSort,
+			Msg: fmt.Sprintf("%v",sendSort),
 			From:"me",
 		}
 		results = append(results,result)
@@ -119,7 +124,7 @@ func AppendAndSort(resultsMe, resultsYou []ws.Trainer) (results []ws.Result, err
 		}
 		result := ws.Result{
 			StartTime:r.StartTime,
-			Msg: sendSort,
+			Msg:  fmt.Sprintf("%v",sendSort),
 			From:"you",
 		}
 		results = append(results,result)

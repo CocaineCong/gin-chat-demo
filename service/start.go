@@ -3,24 +3,25 @@ package service
 import (
 	"chat/conf"
 	"chat/e"
+	"encoding/json"
 	"fmt"
 	"github.com/gorilla/websocket"
 	"log"
-	"unsafe"
 )
 
 func (manager *ClientManager) Start() {
 	for {
 		log.Println("<---监听管道通信--->")
 		select {
-		case conn := <-Manager.Register: // 建立连接
+		case conn := <- Manager.Register: // 建立连接
 			log.Printf("建立新连接: %v", conn.ID)
 			Manager.Clients[conn.ID] = conn
 			replyMsg := &ReplyMsg{
 				Code:    e.WebsocketSuccess,
 				Content: "已连接至服务器",
 			}
-			_ = conn.Socket.WriteMessage(websocket.TextMessage, *(*[]byte)(unsafe.Pointer(replyMsg)))
+			msg , _ := json.Marshal(replyMsg)
+			_ = conn.Socket.WriteMessage(websocket.TextMessage, msg)
 		case conn := <-Manager.Unregister: // 断开连接
 			log.Printf("连接失败:%v", conn.ID)
 			if _, ok := Manager.Clients[conn.ID]; ok {
@@ -28,7 +29,8 @@ func (manager *ClientManager) Start() {
 					Code:    e.WebsocketEnd,
 					Content: "连接已断开",
 				}
-				_ = conn.Socket.WriteMessage(websocket.TextMessage, *(*[]byte)(unsafe.Pointer(replyMsg)))
+				msg , _ := json.Marshal(replyMsg)
+				_ = conn.Socket.WriteMessage(websocket.TextMessage, msg)
 				close(conn.Send)
 				delete(Manager.Clients, conn.ID)
 			}
@@ -56,19 +58,21 @@ func (manager *ClientManager) Start() {
 					Code:    e.WebsocketOnlineReply,
 					Content: "对方在线应答",
 				}
-				_ = broadcast.Client.Socket.WriteMessage(websocket.TextMessage, *(*[]byte)(unsafe.Pointer(replyMsg)))
-				err := InsertMsg(conf.MongoDBName, id, string(message), 1, int64(3*month))
+				msg , err := json.Marshal(replyMsg)
+				_ = broadcast.Client.Socket.WriteMessage(websocket.TextMessage, msg)
+				err = InsertMsg(conf.MongoDBName, id, string(message), 1, int64(3*month))
 				if err != nil {
 					fmt.Println("InsertOneMsg Err", err)
 				}
 			} else {
 				log.Println("对方不在线")
-				replyMsg := &ReplyMsg{
+				replyMsg := ReplyMsg{
 					Code:    e.WebsocketOfflineReply,
 					Content: "对方不在线应答",
 				}
-				_ = broadcast.Client.Socket.WriteMessage(websocket.TextMessage, *(*[]byte)(unsafe.Pointer(replyMsg)))
-				err := InsertMsg(conf.MongoDBName, id, string(message), 0, int64(3*month))
+				msg , err := json.Marshal(replyMsg)
+				_ = broadcast.Client.Socket.WriteMessage(websocket.TextMessage, msg)
+				err = InsertMsg(conf.MongoDBName, id, string(message), 0, int64(3*month))
 				if err != nil {
 					fmt.Println("InsertOneMsg Err", err)
 				}
