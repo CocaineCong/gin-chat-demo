@@ -18,15 +18,15 @@ const month = 60 * 60 * 24 * 30 // 按照30天算一个月
 
 // 发送消息的类型
 type SendMsg struct {
-	Type int `json:"type"`
+	Type    int    `json:"type"`
 	Content string `json:"content"`
 }
 
 // 回复的消息
 type ReplyMsg struct {
-	From 	string  `json:"from"`
-	Code 	int 	`json:"code"`
-	Content string  `json:"content"`
+	From    string `json:"from"`
+	Code    int    `json:"code"`
+	Content string `json:"content"`
 }
 
 // 用户类
@@ -55,17 +55,17 @@ type ClientManager struct {
 
 // Message 信息转JSON (包括：发送者、接收者、内容)
 type Message struct {
-	Sender 		string 		`json:"sender,omitempty"`
-	Recipient 	string 		`json:"recipient,omitempty"`
-	Content 	string 		`json:"content,omitempty"`
+	Sender    string `json:"sender,omitempty"`
+	Recipient string `json:"recipient,omitempty"`
+	Content   string `json:"content,omitempty"`
 }
 
 var Manager  = ClientManager{
-	Clients	 : 	make(map[string]*Client),   // 参与连接的用户，出于性能的考虑，需要设置最大连接数
-	Broadcast:	make(chan *Broadcast),
-	Register : 	make(chan *Client),
-	Reply 	 : 	make(chan *Client),
-	Unregister:	make(chan *Client),
+	Clients:    make(map[string]*Client), // 参与连接的用户，出于性能的考虑，需要设置最大连接数
+	Broadcast:  make(chan *Broadcast),
+	Register:   make(chan *Client),
+	Reply:      make(chan *Client),
+	Unregister: make(chan *Client),
 }
 
 func createId(uid, toUid string) string {
@@ -73,22 +73,22 @@ func createId(uid, toUid string) string {
 }
 
 func WsHandler(c *gin.Context) {
-	uid:=c.Query("uid") // 自己的id
-	toUid:=c.Query("toUid") // 对方的id
+	uid := c.Query("uid")                     // 自己的id
+	toUid := c.Query("toUid")                 // 对方的id
 	conn, err := (&websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool { // CheckOrigin解决跨域问题
-		return true
-	}}).Upgrade(c.Writer, c.Request, nil) // 升级成ws协议
+			return true
+		}}).Upgrade(c.Writer, c.Request, nil) // 升级成ws协议
 	if err != nil {
-		http.NotFound(c.Writer,c.Request)
+		http.NotFound(c.Writer, c.Request)
 		return
 	}
 	// 创建一个用户实例
 	client := &Client{
-		ID 		: createId(uid,toUid),
-		SendID	: createId(toUid,uid),
-		Socket	: conn,
-		Send	: make(chan []byte),
+		ID:     createId(uid, toUid),
+		SendID: createId(toUid, uid),
+		Socket: conn,
+		Send:   make(chan []byte),
 	}
 	// 用户注册到用户管理上
 	Manager.Register <- client
@@ -112,10 +112,10 @@ func (c *Client) Read(){
 			_ = c.Socket.Close()
 			break
 		}
-		if sendMsg.Type == 1 { // 如果有三个人在线上，并且没有接受消息的话。
+		if sendMsg.Type == 1 {
 			r1 ,_ := cache.RedisClient.Get(c.ID).Result()
 			r2 ,_ := cache.RedisClient.Get(c.SendID).Result()
-			if r1 >= "3" && r2 == "" {
+			if r1 >= "3" && r2 == "" {  // 限制单聊
 				replyMsg := ReplyMsg{
 					Code:    e.WebsocketLimit,
 					Content: "达到限制",
@@ -159,7 +159,7 @@ func (c *Client) Read(){
 				_ = c.Socket.WriteMessage(websocket.TextMessage,msg)
 			}
 		}else if sendMsg.Type==3{
-			results,err := FirstFindMsg(conf.MongoDBName,c.SendID,c.ID)
+			results,err := FirsFindtMsg(conf.MongoDBName,c.SendID,c.ID)
 			if err != nil {
 				log.Println(err)
 			}
