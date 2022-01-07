@@ -36,7 +36,7 @@ func FindMany(database string, sendId string,id string,time int64,pageSize int) 
 	var resultsYou []ws.Trainer
 	sendIdCollection := conf.MongoDBClient.Database(database).Collection(sendId)
 	idCollection := conf.MongoDBClient.Database(database).Collection(id)
-	fmt.Println("context.TODO()",context.TODO())
+	// 如果不知道该使用什么context，可以通过context.TODO() 产生context
 	sendIdTimeCursor, err := sendIdCollection.Find(context.TODO(),
 		options.Find().SetSort(bson.D{{"startTime", -1}}), options.Find().SetLimit(int64(pageSize)))
 	idTimeCursor, err := idCollection.Find(context.TODO(),

@@ -115,18 +115,21 @@ func (c *Client) Read(){
 		if sendMsg.Type == 1 {
 			r1 ,_ := cache.RedisClient.Get(c.ID).Result()
 			r2 ,_ := cache.RedisClient.Get(c.SendID).Result()
-			if r1 >= "3" && r2 == "" {  // 限制单聊
+			fmt.Println("c.ID",c.ID)
+			fmt.Println("c.SendID",c.SendID)
+			fmt.Println("r1 r2", r1 , r2)
+			if r1 >= "3" && r2 == "" { // 限制单聊
 				replyMsg := ReplyMsg{
 					Code:    e.WebsocketLimit,
 					Content: "达到限制",
 				}
-				msg , _ := json.Marshal(replyMsg)
+				msg, _ := json.Marshal(replyMsg)
 				_ = c.Socket.WriteMessage(websocket.TextMessage, msg)
-				_,_ = cache.RedisClient.Expire(c.ID,time.Hour*24*30).Result() // 防止重复骚扰，未建立连接刷新过期时间一个月
+				_, _ = cache.RedisClient.Expire(c.ID, time.Hour*24*30).Result() // 防止重复骚扰，未建立连接刷新过期时间一个月
 				continue
-			}else{
+			}else {
 				cache.RedisClient.Incr(c.ID)
-				_ , _ =cache.RedisClient.Expire(c.ID,time.Hour*24*30*3).Result() // 防止过快“分手”，建立连接三个月过期
+				_, _ = cache.RedisClient.Expire(c.ID, time.Hour*24*30*3).Result() // 防止过快“分手”，建立连接三个月过期
 			}
 			log.Println(c.ID,"发送消息",sendMsg.Content)
 			Manager.Broadcast <- &Broadcast{
@@ -138,25 +141,25 @@ func (c *Client) Read(){
 			if err != nil {
 				timeT = 999999999
 			}
-			results, _ := FindMany(conf.MongoDBName,c.SendID,c.ID,int64(timeT),10)
+			results, _ := FindMany(conf.MongoDBName, c.SendID, c.ID, int64(timeT), 10)
 			if len(results) > 10 {
 				results = results[:10]
-			}else if len(results) == 0{
+			} else if len(results) == 0 {
 				replyMsg := ReplyMsg{
-					Code:e.WebsocketEnd,
-					Content:"到底了",
+					Code:    e.WebsocketEnd,
+					Content: "到底了",
 				}
-				msg , _ := json.Marshal(replyMsg)
-				_ = c.Socket.WriteMessage(websocket.TextMessage,msg)
+				msg, _ := json.Marshal(replyMsg)
+				_ = c.Socket.WriteMessage(websocket.TextMessage, msg)
 				continue
 			}
 			for _, result := range results {
 				replyMsg := ReplyMsg{
-					From:result.From,
-					Content:fmt.Sprintf("%s",result.Msg),
+					From:    result.From,
+					Content: fmt.Sprintf("%s", result.Msg),
 				}
-				msg , _ := json.Marshal(replyMsg)
-				_ = c.Socket.WriteMessage(websocket.TextMessage,msg)
+				msg, _ := json.Marshal(replyMsg)
+				_ = c.Socket.WriteMessage(websocket.TextMessage, msg)
 			}
 		}else if sendMsg.Type==3{
 			results,err := FirsFindtMsg(conf.MongoDBName,c.SendID,c.ID)
