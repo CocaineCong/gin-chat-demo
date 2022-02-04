@@ -3,7 +3,7 @@ package service
 import (
 	"chat/cache"
 	"chat/conf"
-	"chat/e"
+	"chat/pkg/e"
 	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -96,7 +96,7 @@ func WsHandler(c *gin.Context) {
 	go client.Write()
 }
 
-func (c *Client) Read(){
+func (c *Client) Read() {
 	defer func() { // 避免忘记关闭，所以要加上close
 		Manager.Unregister <- c
 		_ = c.Socket.Close()
@@ -107,17 +107,14 @@ func (c *Client) Read(){
 		// _,msg,_:=c.Socket.ReadMessage()
 		err := c.Socket.ReadJSON(&sendMsg) // 读取json格式，如果不是json格式，会报错
 		if err != nil {
-			log.Println("数据格式不正确",err)
+			log.Println("数据格式不正确", err)
 			Manager.Unregister <- c
 			_ = c.Socket.Close()
 			break
 		}
 		if sendMsg.Type == 1 {
-			r1 ,_ := cache.RedisClient.Get(c.ID).Result()
-			r2 ,_ := cache.RedisClient.Get(c.SendID).Result()
-			fmt.Println("c.ID",c.ID)
-			fmt.Println("c.SendID",c.SendID)
-			fmt.Println("r1 r2", r1 , r2)
+			r1, _ := cache.RedisClient.Get(c.ID).Result()
+			r2, _ := cache.RedisClient.Get(c.SendID).Result()
 			if r1 >= "3" && r2 == "" { // 限制单聊
 				replyMsg := ReplyMsg{
 					Code:    e.WebsocketLimit,
@@ -127,16 +124,16 @@ func (c *Client) Read(){
 				_ = c.Socket.WriteMessage(websocket.TextMessage, msg)
 				_, _ = cache.RedisClient.Expire(c.ID, time.Hour*24*30).Result() // 防止重复骚扰，未建立连接刷新过期时间一个月
 				continue
-			}else {
+			} else {
 				cache.RedisClient.Incr(c.ID)
 				_, _ = cache.RedisClient.Expire(c.ID, time.Hour*24*30*3).Result() // 防止过快“分手”，建立连接三个月过期
 			}
-			log.Println(c.ID,"发送消息",sendMsg.Content)
+			log.Println(c.ID, "发送消息", sendMsg.Content)
 			Manager.Broadcast <- &Broadcast{
-				Client:c,
-				Message:[]byte(sendMsg.Content),
+				Client:  c,
+				Message: []byte(sendMsg.Content),
 			}
-		}else if sendMsg.Type == 2 { //拉取历史消息
+		} else if sendMsg.Type == 2 { //拉取历史消息
 			timeT, err := strconv.Atoi(sendMsg.Content) // 传送来时间
 			if err != nil {
 				timeT = 999999999
@@ -161,17 +158,17 @@ func (c *Client) Read(){
 				msg, _ := json.Marshal(replyMsg)
 				_ = c.Socket.WriteMessage(websocket.TextMessage, msg)
 			}
-		}else if sendMsg.Type==3{
-			results,err := FirsFindtMsg(conf.MongoDBName,c.SendID,c.ID)
+		} else if sendMsg.Type == 3 {
+			results, err := FirsFindtMsg(conf.MongoDBName, c.SendID, c.ID)
 			if err != nil {
 				log.Println(err)
 			}
 			for _, result := range results {
 				replyMsg := ReplyMsg{
-					From:result.From,
-					Content:fmt.Sprintf("%s",result.Msg),
+					From:    result.From,
+					Content: fmt.Sprintf("%s", result.Msg),
 				}
-				msg , _ := json.Marshal(replyMsg)
+				msg, _ := json.Marshal(replyMsg)
 				_ = c.Socket.WriteMessage(websocket.TextMessage, msg)
 			}
 		}
@@ -182,19 +179,19 @@ func (c *Client) Write() {
 	defer func() {
 		_ = c.Socket.Close()
 	}()
-	for{
+	for {
 		select {
-		case message, ok := <-c.Send :
+		case message, ok := <-c.Send:
 			if !ok {
-				_=c.Socket.WriteMessage(websocket.CloseMessage,[]byte{})
+				_ = c.Socket.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
-			log.Println(c.ID,"接受消息:",string(message))
+			log.Println(c.ID, "接受消息:", string(message))
 			replyMsg := ReplyMsg{
-				Code:e.WebsocketSuccessMessage,
-				Content:fmt.Sprintf("%s",string(message)),
+				Code:    e.WebsocketSuccessMessage,
+				Content: fmt.Sprintf("%s", string(message)),
 			}
-			msg , _ := json.Marshal(replyMsg)
+			msg, _ := json.Marshal(replyMsg)
 			_ = c.Socket.WriteMessage(websocket.TextMessage, msg)
 		}
 	}

@@ -2,7 +2,7 @@ package service
 
 import (
 	"chat/conf"
-	"chat/e"
+	"chat/pkg/e"
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/websocket"
