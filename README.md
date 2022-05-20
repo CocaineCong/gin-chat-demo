@@ -9,6 +9,12 @@ gin+websocket+mongodb实现 IM 即时聊天系统
 - `MongoDB` 用来存放用户聊天信息
 - `Redis` 用来存储处理过期信息
 
+# 项目教程
+B站：https://www.bilibili.com/video/BV1BP4y1H7gV
+
+博客：https://blog.csdn.net/weixin_45304503/article/details/121787022
+
+
 # 项目结构
 
 ```
